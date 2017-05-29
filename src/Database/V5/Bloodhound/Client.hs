@@ -884,9 +884,12 @@ encodeBulkOperation (BulkUpdate (IndexName indexName)
 
 encodeBulkOperation (BulkUpsert (IndexName indexName)
                 (MappingName mappingName)
-                (DocId docId) value (UpsertMetadata moreMeta)) = blob
-    where metadata = mkBulkStreamValueWithMeta moreMeta "update" indexName mappingName docId
-          doc = object ["doc" .= value]
+                (DocId docId)
+                value
+                (UpsertActionMetadata actionMeta)
+                (UpsertDocMetadata docMeta)) = blob
+    where metadata = mkBulkStreamValueWithMeta actionMeta "update" indexName mappingName docId
+          doc = object $ ["doc" .= value] <> docMeta
           blob = encode metadata <> "\n" <> encode doc
 
 -- | 'getDocument' is a straight-forward way to fetch a single document from

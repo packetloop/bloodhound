@@ -161,7 +161,8 @@ module Database.V5.Bloodhound.Types
        , TemplatePattern(..)
        , MappingName(..)
        , DocId(..)
-       , UpsertMetadata(..)
+       , UpsertActionMetadata(..)
+       , UpsertDocMetadata(..)
        , CacheName(..)
        , CacheKey(..)
        , BulkOperation(..)
@@ -690,7 +691,8 @@ data MappingField =
 data Mapping = Mapping { typeName      :: TypeName
                        , mappingFields :: [MappingField] } deriving (Eq, Read, Show, Generic, Typeable)
 
-newtype UpsertMetadata = UpsertMetadata [Pair] deriving (Eq, Read, Show, Generic, Typeable)
+newtype UpsertActionMetadata = UpsertActionMetadata [Pair] deriving (Eq, Read, Show, Generic, Typeable)
+newtype UpsertDocMetadata    = UpsertDocMetadata [Pair] deriving (Eq, Read, Show, Generic, Typeable)
 
 {-| 'BulkOperation' is a sum type for expressing the four kinds of bulk
     operation index, create, delete, and update. 'BulkIndex' behaves like an
@@ -703,7 +705,7 @@ data BulkOperation =
   | BulkCreate IndexName MappingName DocId Value
   | BulkDelete IndexName MappingName DocId
   | BulkUpdate IndexName MappingName DocId Value
-  | BulkUpsert IndexName MappingName DocId Value UpsertMetadata
+  | BulkUpsert IndexName MappingName DocId Value UpsertActionMetadata UpsertDocMetadata
   deriving (Eq, Read, Show, Generic, Typeable)
 
 {-| 'EsResult' describes the standard wrapper JSON document that you see in
