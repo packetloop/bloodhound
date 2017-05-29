@@ -582,7 +582,8 @@ data Mapping =
           , mappingFields :: [MappingField] }
   deriving (Eq, Show)
 
-newtype UpsertMetadata = UpsertMetadata [Pair] deriving (Eq, Show)
+newtype UpsertActionMetadata = UpsertActionMetadata [Pair] deriving (Eq, Show)
+newtype UpsertDocMetadata    = UpsertDocMetadata [Pair] deriving (Eq, Show)
 
 data AllocationPolicy = AllocAll
                       -- ^ Allows shard allocation for all shards.
@@ -636,7 +637,7 @@ data BulkOperation =
     -- ^ Delete the document
   | BulkUpdate IndexName MappingName DocId Value
     -- ^ Update the document, merging the new value with the existing one.
-  | BulkUpsert IndexName MappingName DocId Value UpsertMetadata
+  | BulkUpsert IndexName MappingName DocId Value UpsertActionMetadata UpsertDocMetadata
     -- ^ Update the document, or insert it if there is no existing one.
     deriving (Eq, Show)
 
