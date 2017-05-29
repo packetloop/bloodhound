@@ -104,6 +104,7 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Aeson
+import           Data.Aeson.Types             (Pair)
 import           Data.ByteString.Lazy.Builder
 import qualified Data.ByteString.Lazy.Char8   as L
 import           Data.Foldable                (toList)
@@ -409,7 +410,7 @@ getSnapshots (SnapshotRepoName repoName) sel =
   where
     url = joinPath ["_snapshot", repoName, snapPath]
     snapPath = case sel of
-      AllSnapshots -> "_all"
+      AllSnapshots           -> "_all"
       SnapshotList (s :| ss) -> T.intercalate "," (renderPath <$> (s:ss))
     renderPath (SnapPattern t)              = t
     renderPath (ExactSnap (SnapshotName t)) = t
@@ -477,9 +478,9 @@ getNodesInfo sel = parseEsResponse =<< get =<< url
   where
     url = joinPath ["_nodes", selectionSeg]
     selectionSeg = case sel of
-      LocalNode -> "_local"
+      LocalNode          -> "_local"
       NodeList (l :| ls) -> T.intercalate "," (selToSeg <$> (l:ls))
-      AllNodes -> "_all"
+      AllNodes           -> "_all"
     selToSeg (NodeByName (NodeName n))            = n
     selToSeg (NodeByFullNodeId (FullNodeId i))    = i
     selToSeg (NodeByHost (Server s))              = s
@@ -495,9 +496,9 @@ getNodesStats sel = parseEsResponse =<< get =<< url
   where
     url = joinPath ["_nodes", selectionSeg, "stats"]
     selectionSeg = case sel of
-      LocalNode -> "_local"
+      LocalNode          -> "_local"
       NodeList (l :| ls) -> T.intercalate "," (selToSeg <$> (l:ls))
-      AllNodes -> "_all"
+      AllNodes           -> "_all"
     selToSeg (NodeByName (NodeName n))            = n
     selToSeg (NodeByFullNodeId (FullNodeId i))    = i
     selToSeg (NodeByHost (Server s))              = s
@@ -523,13 +524,13 @@ createIndex indexSettings (IndexName indexName) =
 createIndexWith :: MonadBH m
   => [UpdatableIndexSetting]
   -> Int -- ^ shard count
-  -> IndexName 
+  -> IndexName
   -> m Reply
 createIndexWith updates shards (IndexName indexName) =
   bindM2 put url (return (Just body))
   where url = joinPath [indexName]
         body = encode $ object
-          ["settings" .= deepMerge 
+          ["settings" .= deepMerge
             ( HM.singleton "index.number_of_shards" (toJSON shards) :
               [u | Object u <- toJSON <$> updates]
             )
@@ -575,8 +576,8 @@ getIndexSettings (IndexName indexName) =
   where
     url = joinPath [indexName, "_settings"]
 
--- | 'forceMergeIndex' 
--- 
+-- | 'forceMergeIndex'
+--
 -- The force merge API allows to force merging of one or more indices through
 -- an API. The merge relates to the number of segments a Lucene index holds
 -- within each shard. The force merge operation allows to reduce the number of
@@ -618,7 +619,7 @@ deepMerge = LS.foldl' go mempty
   where go acc = LS.foldl' go' acc . HM.toList
         go' acc (k, v) = HM.insertWith merge k v acc
         merge (Object a) (Object b) = Object (deepMerge [a, b])
-        merge _ b = b
+        merge _ b                   = b
 
 
 statusCodeIs :: (Int, Int) -> Reply -> Bool
@@ -644,13 +645,13 @@ parseEsResponse :: (MonadThrow m, FromJSON a) => Reply
 parseEsResponse reply
   | respIsTwoHunna reply = case eitherDecode body of
                              Right a -> return (Right a)
-                             Left _ -> tryParseError
+                             Left _  -> tryParseError
   | otherwise = tryParseError
   where body = responseBody reply
         tryParseError = case eitherDecode body of
                           Right e -> return (Left e)
                           -- this case should not be possible
-                          Left _ -> explode
+                          Left _  -> explode
         explode = throwM (EsProtocolException body)
 
 -- | 'indexExists' enables you to check if an index exists. Returns 'Bool'
@@ -719,7 +720,7 @@ listIndices =
             indexVal <- HM.lookup "index" obj
             case indexVal of
               String txt -> Just (IndexName txt)
-              _ -> Nothing
+              _          -> Nothing
           _ -> Nothing
 
 -- | 'updateIndexAliases' updates the server's index alias
@@ -805,10 +806,10 @@ putMapping (IndexName indexName) (MappingName mappingName) mapping =
 versionCtlParams :: IndexDocumentSettings -> [(Text, Maybe Text)]
 versionCtlParams cfg =
   case idsVersionControl cfg of
-    NoVersionControl -> []
-    InternalVersion v -> versionParams v "internal"
-    ExternalGT (ExternalDocVersion v) -> versionParams v "external_gt"
-    ExternalGTE (ExternalDocVersion v) -> versionParams v "external_gte"
+    NoVersionControl                    -> []
+    InternalVersion v                   -> versionParams v "internal"
+    ExternalGT (ExternalDocVersion v)   -> versionParams v "external_gt"
+    ExternalGTE (ExternalDocVersion v)  -> versionParams v "external_gte"
     ForceVersion (ExternalDocVersion v) -> versionParams v "force"
   where
     vt = showText . docVersionNumber
@@ -834,7 +835,7 @@ indexDocument (IndexName indexName)
   bindM2 put url (return body)
   where url = addQuery params <$> joinPath [indexName, mappingName, docId]
         parentParams = case idsParent cfg of
-          Nothing -> []
+          Nothing                         -> []
           Just (DocumentParent (DocId p)) -> [ ("parent", Just p) ]
         params = versionCtlParams cfg ++ parentParams
         body = Just (encode document)
@@ -895,11 +896,15 @@ mash :: Builder -> V.Vector L.ByteString -> Builder
 mash = V.foldl' (\b x -> b <> byteString "\n" <> lazyByteString x)
 
 mkBulkStreamValue :: Text -> Text -> Text -> Text -> Value
-mkBulkStreamValue operation indexName mappingName docId =
-  object [operation .=
-          object [ "_index" .= indexName
-                 , "_type"  .= mappingName
-                 , "_id"    .= docId]]
+mkBulkStreamValue = mkBulkStreamValueWithMeta []
+
+mkBulkStreamValueWithMeta :: [Pair] -> Text -> Text -> Text -> Text -> Value
+mkBulkStreamValueWithMeta meta operation indexName mappingName docId =
+  object [ operation .=
+           object ([ "_index" .= indexName
+                   , "_type"  .= mappingName
+                   , "_id"    .= docId]
+                   <> meta)]
 
 mkBulkStreamValueAuto :: Text -> Text -> Text -> Value
 mkBulkStreamValueAuto operation indexName mappingName =
@@ -918,7 +923,7 @@ encodeBulkOperation (BulkIndex (IndexName indexName)
                 (MappingName mappingName)
                 (DocId docId) value) = blob
     where metadata = mkBulkStreamValue "index" indexName mappingName docId
-          blob = encode metadata `mappend` "\n" `mappend` encode value
+          blob = encode metadata <> "\n" <> encode value
 
 encodeBulkOperation (BulkIndexAuto (IndexName indexName)
                 (MappingName mappingName)
@@ -936,7 +941,7 @@ encodeBulkOperation (BulkCreate (IndexName indexName)
                 (MappingName mappingName)
                 (DocId docId) value) = blob
     where metadata = mkBulkStreamValue "create" indexName mappingName docId
-          blob = encode metadata `mappend` "\n" `mappend` encode value
+          blob = encode metadata <> "\n" <> encode value
 
 encodeBulkOperation (BulkDelete (IndexName indexName)
                 (MappingName mappingName)
@@ -949,7 +954,14 @@ encodeBulkOperation (BulkUpdate (IndexName indexName)
                 (DocId docId) value) = blob
     where metadata = mkBulkStreamValue "update" indexName mappingName docId
           doc = object ["doc" .= value]
-          blob = encode metadata `mappend` "\n" `mappend` encode doc
+          blob = encode metadata <> "\n" <> encode doc
+
+encodeBulkOperation (BulkUpsert (IndexName indexName)
+                (MappingName mappingName)
+                (DocId docId) value (UpsertMetadata moreMeta)) = blob
+    where metadata = mkBulkStreamValueWithMeta moreMeta "update" indexName mappingName docId
+          doc = object ["doc" .= value]
+          blob = encode metadata <> "\n" <> encode doc
 
 encodeBulkOperation (BulkCreateEncoding (IndexName indexName)
                 (MappingName mappingName)
@@ -1031,10 +1043,10 @@ searchByType (IndexName indexName)
 -- search results. Note that the search is put into 'SearchTypeScan'
 -- mode and thus results will not be sorted. Combine this with
 -- 'advanceScroll' to efficiently stream through the full result set
-getInitialScroll :: 
-  (FromJSON a, MonadThrow m, MonadBH m) => IndexName -> 
-                                           MappingName -> 
-                                           Search -> 
+getInitialScroll ::
+  (FromJSON a, MonadThrow m, MonadBH m) => IndexName ->
+                                           MappingName ->
+                                           Search ->
                                            m (Either EsError (SearchResult a))
 getInitialScroll (IndexName indexName) (MappingName mappingName) search' = do
     let url = addQuery params <$> joinPath [indexName, mappingName, "_search"]
@@ -1059,14 +1071,14 @@ getInitialSortedScroll (IndexName indexName) (MappingName mappingName) search = 
     resp' <- bindM2 dispatchSearch url (return search)
     parseEsResponse resp'
 
-scroll' :: (FromJSON a, MonadBH m, MonadThrow m) => Maybe ScrollId -> 
+scroll' :: (FromJSON a, MonadBH m, MonadThrow m) => Maybe ScrollId ->
                                                     m ([Hit a], Maybe ScrollId)
 scroll' Nothing = return ([], Nothing)
 scroll' (Just sid) = do
     res <- advanceScroll sid 60
     case res of
       Right SearchResult {..} -> return (hits searchHits, scrollId)
-      Left _ -> return ([], Nothing)
+      Left _                  -> return ([], Nothing)
 
 -- | Use the given scroll to fetch the next page of documents. If there are no
 -- further pages, 'SearchResult.searchHits.hits' will be '[]'.
@@ -1086,13 +1098,13 @@ advanceScroll (ScrollId sid) scroll = do
   where scrollTime = showText secs <> "s"
         secs :: Integer
         secs = round scroll
-        
+
         scrollObject = object [ "scroll" .= scrollTime
                               , "scroll_id" .= sid
                               ]
 
-simpleAccumulator :: 
-  (FromJSON a, MonadBH m, MonadThrow m) => 
+simpleAccumulator ::
+  (FromJSON a, MonadBH m, MonadThrow m) =>
                                 [Hit a] ->
                                 ([Hit a], Maybe ScrollId) ->
                                 m ([Hit a], Maybe ScrollId)

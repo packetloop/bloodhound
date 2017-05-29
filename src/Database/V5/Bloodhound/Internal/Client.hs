@@ -9,16 +9,16 @@ module Database.V5.Bloodhound.Internal.Client where
 
 import           Bloodhound.Import
 
-import qualified Data.Text           as T
-import qualified Data.Traversable    as DT
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Vector         as V
-import qualified Data.Version        as Vers
+import qualified Data.HashMap.Strict                           as HM
+import qualified Data.Text                                     as T
+import qualified Data.Traversable                              as DT
+import qualified Data.Vector                                   as V
+import qualified Data.Version                                  as Vers
 import           GHC.Enum
 import           Network.HTTP.Client
-import qualified Text.ParserCombinators.ReadP as RP
-import           Text.Read           (Read(..))
-import qualified Text.Read           as TR
+import qualified Text.ParserCombinators.ReadP                  as RP
+import           Text.Read                                     (Read (..))
+import qualified Text.Read                                     as TR
 
 import           Database.V5.Bloodhound.Internal.Analysis
 import           Database.V5.Bloodhound.Internal.Newtypes
@@ -388,13 +388,13 @@ data Compression
 instance ToJSON Compression where
   toJSON x = case x of
     CompressionDefault -> toJSON ("default" :: Text)
-    CompressionBest -> toJSON ("best_compression" :: Text)
+    CompressionBest    -> toJSON ("best_compression" :: Text)
 
 instance FromJSON Compression where
   parseJSON = withText "Compression" $ \t -> case t of
-    "default" -> return CompressionDefault
+    "default"          -> return CompressionDefault
     "best_compression" -> return CompressionBest
-    _ -> fail "invalid compression codec"
+    _                  -> fail "invalid compression codec"
 
 -- | A measure of bytes used for various configurations. You may want
 -- to use smart constructors like 'gigabytes' for larger values.
@@ -582,6 +582,8 @@ data Mapping =
           , mappingFields :: [MappingField] }
   deriving (Eq, Show)
 
+newtype UpsertMetadata = UpsertMetadata [Pair] deriving (Eq, Show)
+
 data AllocationPolicy = AllocAll
                       -- ^ Allows shard allocation for all shards.
                       | AllocPrimaries
@@ -634,6 +636,8 @@ data BulkOperation =
     -- ^ Delete the document
   | BulkUpdate IndexName MappingName DocId Value
     -- ^ Update the document, merging the new value with the existing one.
+  | BulkUpsert IndexName MappingName DocId Value UpsertMetadata
+    -- ^ Update the document, or insert it if there is no existing one.
     deriving (Eq, Show)
 
 {-| 'EsResult' describes the standard wrapper JSON document that you see in
