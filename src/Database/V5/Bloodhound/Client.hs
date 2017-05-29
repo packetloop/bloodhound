@@ -100,6 +100,7 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Aeson
+import           Data.Aeson.Types             (Pair)
 import           Data.ByteString.Lazy.Builder
 import qualified Data.ByteString.Lazy.Char8   as L
 import           Data.Foldable                (toList)
@@ -305,7 +306,7 @@ instance FromJSON GSRs where
   parseJSON = withObject "Collection of GenericSnapshotRepo" parse
     where
       parse = fmap GSRs . mapM (uncurry go) . HM.toList
-      go rawName = withObject "GenericSnapshotRepo" $ \o -> do
+      go rawName = withObject "GenericSnapshotRepo" $ \o ->
         GenericSnapshotRepo (SnapshotRepoName rawName) <$> o .: "type"
                                                        <*> o .: "settings"
 
@@ -532,13 +533,12 @@ updateIndexSettings updates (IndexName indexName) =
 
 getIndexSettings :: (MonadBH m, MonadThrow m) => IndexName
                  -> m (Either EsError IndexSettingsSummary)
-getIndexSettings (IndexName indexName) = do
-  parseEsResponse =<< get =<< url
+getIndexSettings (IndexName indexName) = parseEsResponse =<< get =<< url
   where url = joinPath [indexName, "_settings"]
 
 
--- | 'forceMergeIndex' 
--- 
+-- | 'forceMergeIndex'
+--
 -- The force merge API allows to force merging of one or more indices through
 -- an API. The merge relates to the number of segments a Lucene index holds
 -- within each shard. The force merge operation allows to reduce the number of
@@ -837,14 +837,18 @@ encodeBulkOperations stream = collapsed where
   collapsed = toLazyByteString $ mappend mashedTaters (byteString "\n")
 
 mash :: Builder -> V.Vector L.ByteString -> Builder
-mash = V.foldl' (\b x -> b `mappend` (byteString "\n") `mappend` (lazyByteString x))
+mash = V.foldl' (\b x -> b <> byteString "\n" <> lazyByteString x)
 
 mkBulkStreamValue :: Text -> Text -> Text -> Text -> Value
-mkBulkStreamValue operation indexName mappingName docId =
-  object [operation .=
-          object [ "_index" .= indexName
-                 , "_type"  .= mappingName
-                 , "_id"    .= docId]]
+mkBulkStreamValue = mkBulkStreamValueWithMeta []
+
+mkBulkStreamValueWithMeta :: [Pair] -> Text -> Text -> Text -> Text -> Value
+mkBulkStreamValueWithMeta meta operation indexName mappingName docId =
+  object [ operation .=
+           object ([ "_index" .= indexName
+                   , "_type"  .= mappingName
+                   , "_id"    .= docId]
+                   <> meta)]
 
 -- | 'encodeBulkOperation' is a convenience function for dumping a single 'BulkOperation'
 --   into an 'L.ByteString'
@@ -857,13 +861,13 @@ encodeBulkOperation (BulkIndex (IndexName indexName)
                 (MappingName mappingName)
                 (DocId docId) value) = blob
     where metadata = mkBulkStreamValue "index" indexName mappingName docId
-          blob = encode metadata `mappend` "\n" `mappend` encode value
+          blob = encode metadata <> "\n" <> encode value
 
 encodeBulkOperation (BulkCreate (IndexName indexName)
                 (MappingName mappingName)
                 (DocId docId) value) = blob
     where metadata = mkBulkStreamValue "create" indexName mappingName docId
-          blob = encode metadata `mappend` "\n" `mappend` encode value
+          blob = encode metadata <> "\n" <> encode value
 
 encodeBulkOperation (BulkDelete (IndexName indexName)
                 (MappingName mappingName)
@@ -876,7 +880,14 @@ encodeBulkOperation (BulkUpdate (IndexName indexName)
                 (DocId docId) value) = blob
     where metadata = mkBulkStreamValue "update" indexName mappingName docId
           doc = object ["doc" .= value]
-          blob = encode metadata `mappend` "\n" `mappend` encode doc
+          blob = encode metadata <> "\n" <> encode doc
+
+encodeBulkOperation (BulkUpsert (IndexName indexName)
+                (MappingName mappingName)
+                (DocId docId) value (UpsertMetadata moreMeta)) = blob
+    where metadata = mkBulkStreamValueWithMeta moreMeta "update" indexName mappingName docId
+          doc = object ["doc" .= value]
+          blob = encode metadata <> "\n" <> encode doc
 
 -- | 'getDocument' is a straight-forward way to fetch a single document from
 --   Elasticsearch using a 'Server', 'IndexName', 'MappingName', and a 'DocId'.
@@ -943,10 +954,10 @@ searchByType (IndexName indexName)
 -- search results. Note that the search is put into 'SearchTypeScan'
 -- mode and thus results will not be sorted. Combine this with
 -- 'advanceScroll' to efficiently stream through the full result set
-getInitialScroll :: 
-  (FromJSON a, MonadThrow m, MonadBH m) => IndexName -> 
-                                           MappingName -> 
-                                           Search -> 
+getInitialScroll ::
+  (FromJSON a, MonadThrow m, MonadBH m) => IndexName ->
+                                           MappingName ->
+                                           Search ->
                                            m (Either EsError (SearchResult a))
 getInitialScroll (IndexName indexName) (MappingName mappingName) search' = do
     let url = addQuery params <$> joinPath [indexName, mappingName, "_search"]
@@ -971,7 +982,7 @@ getInitialSortedScroll (IndexName indexName) (MappingName mappingName) search = 
     resp' <- bindM2 dispatchSearch url (return search)
     parseEsResponse resp'
 
-scroll' :: (FromJSON a, MonadBH m, MonadThrow m) => Maybe ScrollId -> 
+scroll' :: (FromJSON a, MonadBH m, MonadThrow m) => Maybe ScrollId ->
                                                     m ([Hit a], Maybe ScrollId)
 scroll' Nothing = return ([], Nothing)
 scroll' (Just sid) = do
@@ -998,13 +1009,13 @@ advanceScroll (ScrollId sid) scroll = do
   where scrollTime = showText secs <> "s"
         secs :: Integer
         secs = round scroll
-        
+
         scrollObject = object [ "scroll" .= scrollTime
                               , "scroll_id" .= sid
                               ]
 
-simpleAccumulator :: 
-  (FromJSON a, MonadBH m, MonadThrow m) => 
+simpleAccumulator ::
+  (FromJSON a, MonadBH m, MonadThrow m) =>
                                 [Hit a] ->
                                 ([Hit a], Maybe ScrollId) ->
                                 m ([Hit a], Maybe ScrollId)

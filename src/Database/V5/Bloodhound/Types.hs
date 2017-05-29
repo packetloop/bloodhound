@@ -161,6 +161,7 @@ module Database.V5.Bloodhound.Types
        , TemplatePattern(..)
        , MappingName(..)
        , DocId(..)
+       , UpsertMetadata(..)
        , CacheName(..)
        , CacheKey(..)
        , BulkOperation(..)
@@ -689,6 +690,8 @@ data MappingField =
 data Mapping = Mapping { typeName      :: TypeName
                        , mappingFields :: [MappingField] } deriving (Eq, Read, Show, Generic, Typeable)
 
+newtype UpsertMetadata = UpsertMetadata [Pair] deriving (Eq, Read, Show, Generic, Typeable)
+
 {-| 'BulkOperation' is a sum type for expressing the four kinds of bulk
     operation index, create, delete, and update. 'BulkIndex' behaves like an
     "upsert", 'BulkCreate' will fail if a document already exists at the DocId.
@@ -699,7 +702,9 @@ data BulkOperation =
     BulkIndex  IndexName MappingName DocId Value
   | BulkCreate IndexName MappingName DocId Value
   | BulkDelete IndexName MappingName DocId
-  | BulkUpdate IndexName MappingName DocId Value deriving (Eq, Read, Show, Generic, Typeable)
+  | BulkUpdate IndexName MappingName DocId Value
+  | BulkUpsert IndexName MappingName DocId Value UpsertMetadata
+  deriving (Eq, Read, Show, Generic, Typeable)
 
 {-| 'EsResult' describes the standard wrapper JSON document that you see in
     successful Elasticsearch lookups or lookups that couldn't find the document.
