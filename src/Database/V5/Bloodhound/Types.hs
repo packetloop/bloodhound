@@ -170,7 +170,9 @@ module Database.V5.Bloodhound.Types
        , MappingName(..)
        , DocId(..)
        , UpsertActionMetadata(..)
-       , UpsertDocMetadata(..)
+       , buildUpsertActionMetadata
+       , UpsertPayloadMetadata(..)
+       , buildUpsertPayloadMetadata
        , CacheName(..)
        , CacheKey(..)
        , BulkOperation(..)
