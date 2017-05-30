@@ -100,7 +100,6 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Aeson
-import           Data.Aeson.Types             (Pair)
 import           Data.ByteString.Lazy.Builder
 import qualified Data.ByteString.Lazy.Char8   as L
 import           Data.Foldable                (toList)
@@ -842,13 +841,13 @@ mash = V.foldl' (\b x -> b <> byteString "\n" <> lazyByteString x)
 mkBulkStreamValue :: Text -> Text -> Text -> Text -> Value
 mkBulkStreamValue = mkBulkStreamValueWithMeta []
 
-mkBulkStreamValueWithMeta :: [Pair] -> Text -> Text -> Text -> Text -> Value
+mkBulkStreamValueWithMeta :: [UpsertActionMetadata] -> Text -> Text -> Text -> Text -> Value
 mkBulkStreamValueWithMeta meta operation indexName mappingName docId =
   object [ operation .=
            object ([ "_index" .= indexName
                    , "_type"  .= mappingName
                    , "_id"    .= docId]
-                   <> meta)]
+                   <> (buildUpsertActionMetadata <$> meta))]
 
 -- | 'encodeBulkOperation' is a convenience function for dumping a single 'BulkOperation'
 --   into an 'L.ByteString'
@@ -886,10 +885,10 @@ encodeBulkOperation (BulkUpsert (IndexName indexName)
                 (MappingName mappingName)
                 (DocId docId)
                 value
-                (UpsertActionMetadata actionMeta)
-                (UpsertDocMetadata docMeta)) = blob
+                actionMeta
+                docMeta) = blob
     where metadata = mkBulkStreamValueWithMeta actionMeta "update" indexName mappingName docId
-          doc = object $ ["doc" .= value] <> docMeta
+          doc = object $ ["doc" .= value] <> (buildUpsertPayloadMetadata <$> docMeta)
           blob = encode metadata <> "\n" <> encode doc
 
 -- | 'getDocument' is a straight-forward way to fetch a single document from
