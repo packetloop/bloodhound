@@ -162,7 +162,9 @@ module Database.V5.Bloodhound.Types
        , MappingName(..)
        , DocId(..)
        , UpsertActionMetadata(..)
-       , UpsertDocMetadata(..)
+       , buildUpsertActionMetadata
+       , UpsertPayloadMetadata(..)
+       , buildUpsertPayloadMetadata
        , CacheName(..)
        , CacheKey(..)
        , BulkOperation(..)
@@ -691,8 +693,33 @@ data MappingField =
 data Mapping = Mapping { typeName      :: TypeName
                        , mappingFields :: [MappingField] } deriving (Eq, Read, Show, Generic, Typeable)
 
-newtype UpsertActionMetadata = UpsertActionMetadata [Pair] deriving (Eq, Read, Show, Generic, Typeable)
-newtype UpsertDocMetadata    = UpsertDocMetadata [Pair] deriving (Eq, Read, Show, Generic, Typeable)
+data UpsertActionMetadata
+  = UA_RetryOnConflict Int
+  | UA_Source Bool
+  | UA_Version Int
+  deriving (Eq, Read, Show, Generic, Typeable)
+
+buildUpsertActionMetadata :: UpsertActionMetadata -> Pair
+buildUpsertActionMetadata (UA_RetryOnConflict i) = "_retry_on_conflict" .= i
+buildUpsertActionMetadata (UA_Source b)          = "_source"            .= b
+buildUpsertActionMetadata (UA_Version i)         = "_version"           .= i
+
+data UpsertPayloadMetadata
+  = UP_DocAsUpsert Bool
+  | UP_Script Value
+  | UP_Lang Text
+  | UP_Params Value
+  | UP_Upsert Value
+  | UP_Source Bool
+  deriving (Eq, Read, Show, Generic, Typeable)
+
+buildUpsertPayloadMetadata :: UpsertPayloadMetadata -> Pair
+buildUpsertPayloadMetadata (UP_DocAsUpsert a) = "doc_as_upsert" .= a
+buildUpsertPayloadMetadata (UP_Script a)      = "script"        .= a
+buildUpsertPayloadMetadata (UP_Lang a)        = "lang"          .= a
+buildUpsertPayloadMetadata (UP_Params a)      = "params"        .= a
+buildUpsertPayloadMetadata (UP_Upsert a)      = "upsert"        .= a
+buildUpsertPayloadMetadata (UP_Source a)      = "_source"       .= a
 
 {-| 'BulkOperation' is a sum type for expressing the four kinds of bulk
     operation index, create, delete, and update. 'BulkIndex' behaves like an
@@ -705,7 +732,7 @@ data BulkOperation =
   | BulkCreate IndexName MappingName DocId Value
   | BulkDelete IndexName MappingName DocId
   | BulkUpdate IndexName MappingName DocId Value
-  | BulkUpsert IndexName MappingName DocId Value UpsertActionMetadata UpsertDocMetadata
+  | BulkUpsert IndexName MappingName DocId Value [UpsertActionMetadata] [UpsertPayloadMetadata]
   deriving (Eq, Read, Show, Generic, Typeable)
 
 {-| 'EsResult' describes the standard wrapper JSON document that you see in
