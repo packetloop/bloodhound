@@ -570,6 +570,7 @@ updateIndexSettings updates (IndexName indexName) =
 
 getIndexSettings :: (MonadBH m, MonadThrow m) => IndexName
                  -> m (Either EsError IndexSettingsSummary)
+
 getIndexSettings (IndexName indexName) =
   parseEsResponse =<< get =<< url
   where
