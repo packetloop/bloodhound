@@ -12,11 +12,10 @@ import           Bloodhound.Import
 import qualified Data.Text           as T
 import qualified Data.Traversable    as DT
 import qualified Data.HashMap.Strict as HM
+import qualified Data.SemVer         as SemVer
 import qualified Data.Vector         as V
-import qualified Data.Version        as Vers
 import           GHC.Enum
 import           Network.HTTP.Client
-import qualified Text.ParserCombinators.ReadP as RP
 import           Text.Read           (Read(..))
 import qualified Text.Read           as TR
 
@@ -98,7 +97,7 @@ data Version = Version { number         :: VersionNumber
 
 -- | Traditional software versioning number
 newtype VersionNumber = VersionNumber
-  { versionNumber :: Vers.Version }
+  { versionNumber :: SemVer.Version }
   deriving (Eq, Ord, Show)
 
 {-| 'Status' is a data type for describing the JSON body returned by
@@ -723,8 +722,9 @@ sure that your mappings are correct, then this error may be an indication of an
 incompatibility between Bloodhound and Elasticsearch. Please open a bug report
 and be sure to include the exception body.
 -}
-newtype EsProtocolException = EsProtocolException
-  { esProtoExBody :: LByteString
+data EsProtocolException = EsProtocolException
+  { esProtoExMessage :: !Text
+  , esProtoExBody :: !LByteString
   } deriving (Eq, Show)
 
 instance Exception EsProtocolException
@@ -1448,15 +1448,20 @@ data NodeJVMInfo = NodeJVMInfo {
     , nodeJVMInfoMemoryInfo              :: JVMMemoryInfo
     , nodeJVMInfoStartTime               :: UTCTime
     , nodeJVMInfoVMVendor                :: Text
-    , nodeJVMVMVersion                   :: VersionNumber
+    , nodeJVMVMVersion                   :: VMVersion
     -- ^ JVM doesn't seme to follow normal version conventions
     , nodeJVMVMName                      :: Text
-    , nodeJVMVersion                     :: VersionNumber
+    , nodeJVMVersion                     :: JVMVersion
     , nodeJVMPID                         :: PID
     } deriving (Eq, Show)
 
--- | Handles quirks in the way JVM versions are rendered (1.7.0_101 -> 1.7.0.101)
-newtype JVMVersion = JVMVersion { unJVMVersion :: VersionNumber }
+-- | We cannot parse JVM version numbers and we're not going to try.
+newtype JVMVersion =
+  JVMVersion { unJVMVersion :: Text }
+  deriving (Eq, Show)
+
+instance FromJSON JVMVersion where
+  parseJSON = withText "JVMVersion" (pure . JVMVersion)
 
 data JVMMemoryInfo = JVMMemoryInfo {
       jvmMemoryInfoDirectMax   :: Bytes
@@ -1465,6 +1470,18 @@ data JVMMemoryInfo = JVMMemoryInfo {
     , jvmMemoryInfoHeapMax     :: Bytes
     , jvmMemoryInfoHeapInit    :: Bytes
     } deriving (Eq, Show)
+
+-- VM version numbers don't appear to be SemVer
+-- so we're special casing this jawn.
+newtype VMVersion =
+  VMVersion { unVMVersion :: Text }
+  deriving (Eq, Show)
+
+instance ToJSON VMVersion where
+  toJSON = toJSON . unVMVersion
+
+instance FromJSON VMVersion where
+  parseJSON = withText "VMVersion" (pure . VMVersion)
 
 newtype JVMMemoryPool = JVMMemoryPool {
       jvmMemoryPool :: Text
@@ -2258,13 +2275,8 @@ instance FromJSON NodeJVMInfo where
                             <*> o .: "vm_vendor"
                             <*> o .: "vm_version"
                             <*> o .: "vm_name"
-                            <*> (unJVMVersion <$> o .: "version")
+                            <*> o .: "version"
                             <*> o .: "pid"
-
-instance FromJSON JVMVersion where
-  parseJSON (String t) =
-    JVMVersion <$> parseJSON (String (T.replace "_" "." t))
-  parseJSON v = JVMVersion <$> parseJSON v
 
 instance FromJSON JVMMemoryInfo where
   parseJSON = withObject "JVMMemoryInfo" parse
@@ -2427,12 +2439,12 @@ instance FromJSON Version where
                     <*> o .: "lucene_version"
 
 instance ToJSON VersionNumber where
-  toJSON = toJSON . Vers.showVersion . versionNumber
+  toJSON = toJSON . SemVer.toText . versionNumber
 
 instance FromJSON VersionNumber where
-  parseJSON = withText "VersionNumber" (parse . T.unpack)
+  parseJSON = withText "VersionNumber" parse
     where
-      parse s = case filter (null . snd)(RP.readP_to_S Vers.parseVersion s) of
-                  [(v, _)] -> pure (VersionNumber v)
-                  [] -> fail ("Invalid version string " ++ s)
-                  xs -> fail ("Ambiguous version string " ++ s ++ " (" ++ intercalate ", " (Vers.showVersion . fst <$> xs) ++ ")")
+      parse t =
+        case SemVer.fromText t of
+          (Left err) -> fail err
+          (Right v) -> return (VersionNumber v)

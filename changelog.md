@@ -3,6 +3,10 @@
 - @bitemyapp
   - Reorganized V5 modules internally, ripped out Generic,
     rewrote part of the test suite.
+  - Added message field to EsProtocolException
+  - Switch from Data.Version to Data.SemVer to support parsing broader version format.
+  - Drop support for GHC < 8.0
+  - Remove upper bound on aeson.
 - @mxavier
   - Reorganized V1 modules, mirroring the work done on V5.
 - @andrewthad
@@ -16,6 +20,8 @@
 - @rvl
   - Add [character filters][] to the `AnalyzerDefinition` type.
   - Add the "stemmer" and "stop" [token filters][] to `TokenFilterDefinition`.
+- @ahodgen
+  - Add support for wildcard queries
 
 [Character Filters]: https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-charfilters.html
 [Token Filters]: https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-tokenfilters.html

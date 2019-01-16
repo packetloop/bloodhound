@@ -9,6 +9,7 @@ module Bloodhound.Import
   , showText
   , deleteSeveral
   , oPath
+  , tshow
   ) where
 
 import           Control.Applicative       as X (Alternative (..), optional)
@@ -79,3 +80,6 @@ deleteSeveral ks hm = foldr HM.delete hm ks
 oPath :: ToJSON a => NonEmpty Text -> a -> Value
 oPath (k :| []) v   = object [k .= v]
 oPath (k:| (h:t)) v = object [k .= oPath (h :| t) v]
+
+tshow :: Show a => a -> Text
+tshow = T.pack . show
