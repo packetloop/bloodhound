@@ -931,14 +931,13 @@ mkBulkStreamValue :: Text -> Text -> Text -> Text -> Value
 mkBulkStreamValue operation indexName mappingName docId =
   object [operation .=
           object [ "_index" .= indexName
-                 , "_type"  .= mappingName
-                 , "_id"    .= docId]]
+                 , "_id"    .= docId
+                 ]]
 
 mkBulkStreamValueAuto :: Text -> Text -> Text -> Value
 mkBulkStreamValueAuto operation indexName mappingName =
   object [operation .=
-          object [ "_index" .= indexName
-                 , "_type"  .= mappingName]]
+          object [ "_index" .= indexName ]]
 
 mkBulkStreamValueWithMeta :: [UpsertActionMetadata] -> Text -> Text -> Text -> Text -> Value
 mkBulkStreamValueWithMeta meta operation indexName mappingName docId =
