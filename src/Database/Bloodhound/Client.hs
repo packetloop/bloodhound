@@ -57,6 +57,7 @@ module Database.Bloodhound.Client
        -- ** Searching
        , searchAll
        , searchByIndex
+       , countByIndex
        , searchByIndices
        , searchByIndexTemplate
        , searchByIndicesTemplate
@@ -1069,6 +1070,16 @@ searchAll = bindM2 dispatchSearch url . return
 searchByIndex :: MonadBH m => IndexName -> Search -> m Reply
 searchByIndex (IndexName indexName) = bindM2 dispatchSearch url . return
   where url = joinPath [indexName, "_search"]
+
+-- | 'countByIndex', given a 'Search' and an 'IndexName', will perform that search
+--   within an index on an Elasticsearch server.
+--
+-- >>> let query = TermQuery (Term "user" "bitemyapp") Nothing
+-- >>> let search = mkSearch (Just query) Nothing
+-- >>> reply <- runBH' $ countByIndex testIndex search
+countByIndex :: MonadBH m => IndexName -> Search -> m Reply
+countByIndex (IndexName indexName) = bindM2 dispatchSearch url . return
+  where url = joinPath [indexName, "_count"]
 
 -- | 'searchByIndices' is a variant of 'searchByIndex' that executes a
 --   'Search' over many indices. This is much faster than using
