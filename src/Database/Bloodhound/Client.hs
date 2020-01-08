@@ -1051,6 +1051,11 @@ dispatchSearch :: MonadBH m => Text -> Search -> m Reply
 dispatchSearch url search = post url' (Just (encode search))
   where url' = appendSearchTypeParam url (searchType search)
 
+appendCountTypeParam = appendSearchTypeParam
+dispatchCount :: MonadBH m => Text -> Count -> m Reply
+dispatchCount url count = post url' (Just (encode count))
+  where url' = appendCountTypeParam url (countSearchType count)
+
 -- | 'searchAll', given a 'Search', will perform that search against all indexes
 --   on an Elasticsearch server. Try to avoid doing this if it can be helped.
 --
@@ -1077,8 +1082,8 @@ searchByIndex (IndexName indexName) = bindM2 dispatchSearch url . return
 -- >>> let query = TermQuery (Term "user" "bitemyapp") Nothing
 -- >>> let search = mkSearch (Just query) Nothing
 -- >>> reply <- runBH' $ countByIndex testIndex search
-countByIndex :: MonadBH m => IndexName -> Search -> m Reply
-countByIndex (IndexName indexName) = bindM2 dispatchSearch url . return
+countByIndex :: MonadBH m => IndexName -> Count -> m Reply
+countByIndex (IndexName indexName) = bindM2 dispatchCount url . return
   where url = joinPath [indexName, "_count"]
 
 -- | 'searchByIndices' is a variant of 'searchByIndex' that executes a
@@ -1238,6 +1243,23 @@ scanSearch indexName search = do
 mkSearch :: Maybe Query -> Maybe Filter -> Search
 mkSearch query filter = Search query filter Nothing Nothing Nothing False (From 0) (Size 10) SearchTypeQueryThenFetch Nothing Nothing Nothing Nothing Nothing
 
+
+
+mkCount :: Maybe Query -> Count
+mkCount query = Count query SearchTypeQueryThenFetch
+  
+-- | 'mkCountSearch' is a helper function for defaulting additional fields of a 'Search'
+--   to Nothing in case you only care about your 'Query' and 'Filter'. Use record update
+--   syntax if you want to add things like aggregations or highlights while still using
+--   this helper function.
+--
+-- >>> let query = TermQuery (Term "user" "bitemyapp") Nothing
+-- >>> mkCountSearch (Just query) Nothing
+-- Search {queryBody = Just (TermQuery (Term {termField = "user", termValue = "bitemyapp"}) Nothing), filterBody = Nothing, searchAfterKey = Nothing, sortBody = Nothing, aggBody = Nothing, highlight = Nothing, trackSortScores = False, from = From 0, size = Size 10, searchType = SearchTypeQueryThenFetch, fields = Nothing, source = Nothing}
+mkCountSearch :: Maybe Query -> Maybe Filter -> Search
+mkCountSearch query filter = Search query filter Nothing Nothing Nothing False (From 0) (Size 10) SearchTypeQueryThenFetch Nothing Nothing Nothing Nothing Nothing
+
+  
 -- | 'mkAggregateSearch' is a helper function that defaults everything in a 'Search' except for
 --   the 'Query' and the 'Aggregation'.
 --

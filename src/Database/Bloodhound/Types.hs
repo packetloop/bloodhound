@@ -105,6 +105,7 @@ module Database.Bloodhound.Types
        , JoinRelation(..)
        , IndexDocumentSettings(..)
        , Query(..)
+       , Count(..)
        , Search(..)
        , SearchType(..)
        , SearchResult(..)
@@ -459,7 +460,15 @@ data Search = Search { queryBody       :: Maybe Query
                      , suggestBody     :: Maybe Suggest -- ^ Only one Suggestion request / response per Search is supported.
                      } deriving (Eq, Show)
 
+data Count = Count { countQueryBody       :: Maybe Query
+                    , countSearchType      :: SearchType
+                     } deriving (Eq, Show)
 
+instance ToJSON Count where
+  toJSON (Count mquery _) =
+    omitNulls [ "query" .= mquery]
+
+  
 instance ToJSON Search where
   toJSON (Search mquery sFilter sort searchAggs
           highlight sTrackSortScores sFrom sSize _ sAfter sFields
