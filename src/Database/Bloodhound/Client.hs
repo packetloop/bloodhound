@@ -67,6 +67,7 @@ module Database.Bloodhound.Client
        , advanceScroll
        , refreshIndex
        , mkSearch
+       , mkCount
        , mkAggregateSearch
        , mkHighlightSearch
        , mkSearchTemplate
