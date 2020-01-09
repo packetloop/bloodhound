@@ -109,6 +109,7 @@ module Database.Bloodhound.Types
        , Search(..)
        , SearchType(..)
        , SearchResult(..)
+       , CountResult(..)
        , ScrollId(..)
        , HitsTotalRelation(..)
        , HitsTotal(..)
