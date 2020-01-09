@@ -539,6 +539,18 @@ newtype Pattern = Pattern Text deriving (Eq, Read, Show)
 instance ToJSON Pattern where
   toJSON (Pattern pattern) = toJSON pattern
 
+data CountResult a =
+  CountResult { crCount         :: Int
+               , crShards       :: ShardResult
+               }
+  deriving (Eq, Show)
+
+instance (FromJSON a) => FromJSON (CountResult a) where
+  parseJSON (Object v) = CountResult <$>
+                         v .:  "count"         <*>
+                         v .:  "_shards"
+  parseJSON _          = empty
+  
 data SearchResult a =
   SearchResult { took         :: Int
                , timedOut     :: Bool
