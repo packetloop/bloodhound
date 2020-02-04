@@ -1245,20 +1245,14 @@ mkSearch :: Maybe Query -> Maybe Filter -> Search
 mkSearch query filter = Search query filter Nothing Nothing Nothing False (From 0) (Size 10) SearchTypeQueryThenFetch Nothing Nothing Nothing Nothing Nothing
 
 
-
-mkCount :: Maybe Query -> Count
-mkCount query = Count query SearchTypeQueryThenFetch
-  
--- | 'mkCountSearch' is a helper function for defaulting additional fields of a 'Search'
---   to Nothing in case you only care about your 'Query' and 'Filter'. Use record update
---   syntax if you want to add things like aggregations or highlights while still using
---   this helper function.
+-- | 'mkCount' is a helper function for defaulting additional field of a 'Count'
+--   and resemble the similar function for Search endpoint
 --
 -- >>> let query = TermQuery (Term "user" "bitemyapp") Nothing
--- >>> mkCountSearch (Just query) Nothing
--- Search {queryBody = Just (TermQuery (Term {termField = "user", termValue = "bitemyapp"}) Nothing), filterBody = Nothing, searchAfterKey = Nothing, sortBody = Nothing, aggBody = Nothing, highlight = Nothing, trackSortScores = False, from = From 0, size = Size 10, searchType = SearchTypeQueryThenFetch, fields = Nothing, source = Nothing}
-mkCountSearch :: Maybe Query -> Maybe Filter -> Search
-mkCountSearch query filter = Search query filter Nothing Nothing Nothing False (From 0) (Size 10) SearchTypeQueryThenFetch Nothing Nothing Nothing Nothing Nothing
+-- >>> mkCount (Just query)
+-- Count {countQueryBody = Just (TermQuery (Term {termField = "user", termValue = "bitemyapp"}) Nothing), countSearchType = SearchTypeQueryThenFetch}
+mkCount :: Maybe Query -> Count
+mkCount query = Count query SearchTypeQueryThenFetch
 
   
 -- | 'mkAggregateSearch' is a helper function that defaults everything in a 'Search' except for
