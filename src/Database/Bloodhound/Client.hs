@@ -57,6 +57,7 @@ module Database.Bloodhound.Client
        -- ** Searching
        , searchAll
        , searchByIndex
+       , countByIndex
        , searchByIndices
        , searchByIndexTemplate
        , searchByIndicesTemplate
@@ -66,6 +67,7 @@ module Database.Bloodhound.Client
        , advanceScroll
        , refreshIndex
        , mkSearch
+       , mkCount
        , mkAggregateSearch
        , mkHighlightSearch
        , mkSearchTemplate
@@ -1050,6 +1052,11 @@ dispatchSearch :: MonadBH m => Text -> Search -> m Reply
 dispatchSearch url search = post url' (Just (encode search))
   where url' = appendSearchTypeParam url (searchType search)
 
+appendCountTypeParam = appendSearchTypeParam
+dispatchCount :: MonadBH m => Text -> Count -> m Reply
+dispatchCount url count = post url' (Just (encode count))
+  where url' = appendCountTypeParam url (countSearchType count)
+
 -- | 'searchAll', given a 'Search', will perform that search against all indexes
 --   on an Elasticsearch server. Try to avoid doing this if it can be helped.
 --
@@ -1069,6 +1076,16 @@ searchAll = bindM2 dispatchSearch url . return
 searchByIndex :: MonadBH m => IndexName -> Search -> m Reply
 searchByIndex (IndexName indexName) = bindM2 dispatchSearch url . return
   where url = joinPath [indexName, "_search"]
+
+-- | 'countByIndex', given a 'Search' and an 'IndexName', will perform that search
+--   within an index on an Elasticsearch server.
+--
+-- >>> let query = TermQuery (Term "user" "bitemyapp") Nothing
+-- >>> let search = mkSearch (Just query) Nothing
+-- >>> reply <- runBH' $ countByIndex testIndex search
+countByIndex :: MonadBH m => IndexName -> Count -> m Reply
+countByIndex (IndexName indexName) = bindM2 dispatchCount url . return
+  where url = joinPath [indexName, "_count"]
 
 -- | 'searchByIndices' is a variant of 'searchByIndex' that executes a
 --   'Search' over many indices. This is much faster than using
@@ -1227,6 +1244,17 @@ scanSearch indexName search = do
 mkSearch :: Maybe Query -> Maybe Filter -> Search
 mkSearch query filter = Search query filter Nothing Nothing Nothing False (From 0) (Size 10) SearchTypeQueryThenFetch Nothing Nothing Nothing Nothing Nothing
 
+
+-- | 'mkCount' is a helper function for defaulting additional field of a 'Count'
+--   and resemble the similar function for Search endpoint
+--
+-- >>> let query = TermQuery (Term "user" "bitemyapp") Nothing
+-- >>> mkCount (Just query)
+-- Count {countQueryBody = Just (TermQuery (Term {termField = "user", termValue = "bitemyapp"}) Nothing), countSearchType = SearchTypeQueryThenFetch}
+mkCount :: Maybe Query -> Count
+mkCount query = Count query SearchTypeQueryThenFetch
+
+  
 -- | 'mkAggregateSearch' is a helper function that defaults everything in a 'Search' except for
 --   the 'Query' and the 'Aggregation'.
 --
